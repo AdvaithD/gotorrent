@@ -35,3 +35,49 @@ func completeHandshake(conn net.Conn, infohash, peerID [20]byte) (*handshake.Han
 	}
 	return res,nil
 }
+
+func recvBitfield(conn net.Conn) (bitfield.Bitfield, error) {
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+	defer conn.SetDeadline(time.Time{})
+
+	msg, err := message.Read(conn)
+	if err != nil {
+		return nil, err
+	}
+	if msg == nil {
+		err := fmt.Errorf("Expected bitfield but got %s", msg)
+		return nil,err
+	}
+	if msg.ID != message.MsgBitfield {
+		err := fmt.Errorf("Expected bitfield but got IF %d", msg.ID)
+		return nil, err
+	}
+	return msg.Payload, nil
+}
+
+func New(peer peers.Peer, peerID, infoHash [20]byte) (*Client, error) {
+	conn, err := net.DialTimeout("tcp", peer.String(), 3 * time.Second)
+	if err != nil {
+		return nil, err
+	}
+	_, err = completeHandshake(conn, infohash, peerID)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	
+	bf, err := recvBitfield(conn)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+
+	return &Client{
+		Conn: conn,
+		Choked: true,
+		Birfield: bf,
+		peer: peer,
+		infoHash: infoHash,
+		peerID: peerID,
+	}, nil
+}
