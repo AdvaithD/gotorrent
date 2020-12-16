@@ -71,3 +71,39 @@ func (state *pieceProgress) readMessage() {
 	}
 	return nil
 }
+
+func attemptDownloadPiece(c *client.Client, pw *pieceWork) ([]byte, error) {
+	state := pieceProgress(
+		index: pw.index,
+		client: c,
+		buf: make([]byte, pw.length),
+	)
+
+	// deadline makes sure we pull bad peers out of frozen state
+	c.Conn.SetDeadline(time.Now().Add(30 * time.Second))
+	defer c.Conn.SetDeadline(time.Time{})
+
+	for state.downloaded < pw.length {
+		if !state.client.Choked {
+			for state.backlog < MaxBacklog && state.requested < pw.length {
+				blockSize := MaxBlockSize
+				if pw.length-state.requestsd < blockSize {
+					blockSize = pw.length - state.requested
+				}
+
+				err := c.sendRequest(pw.index, state.requested, blockSize)
+				if err != nil {
+					return nil, err
+				}
+				state.backlog++
+				state.requested += blockSize
+			}
+		}
+
+		err := state.readMessage()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return state.buf, nil
+}
