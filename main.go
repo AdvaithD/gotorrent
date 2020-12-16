@@ -1,25 +1,21 @@
+package main
+
 import (
-"github.com/jackpal/bencode-go"
+	"log"
+	"os"
+	"github.com/veggiedefender/torrent-client/torrentfile"
 )
 
-type bencodeInfo struct {
-  Pieces      string `bencode:"pieces"`
-  PieceLength int `bencode:"piece length"`
-  Length      int `bencode:"length"`
-  Name        string `bencode:"name"`
-}
+func main() {
+	inPath := os.Args[1]
+	outPath := os.Args[2]
 
-type bencodeTorrent struct {
-  Announce string      `bencode:"announce"`
-  Info     bencodeInfo `bencode:"info"`
-}
-
-
-func Open(r io.Reader) (*bencodeTorrent, error) {
-  bto := bencodeTorrent{}
-  err := bencode.Unmarshal(r, &bto)
-  if err != nul {
-    return nil, err 
-  }
-  return &bto, nil
+	tf, err := torrentfile.Open(inPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = tf.DownloadToFile(outPath)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
